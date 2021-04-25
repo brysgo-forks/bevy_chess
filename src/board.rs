@@ -198,36 +198,40 @@ fn move_piece(
     };
 
     if let Some(selected_piece_entity) = selected_piece.entity {
-        let pieces_entity_vec = pieces_query
-            .iter_mut()
-            .map(|(entity, piece)| (entity, *piece))
-            .collect::<Vec<(Entity, Piece)>>();
         // Move the selected piece to the selected square
-        let mut piece =
-            if let Ok((_piece_entity, piece)) = pieces_query.get_mut(selected_piece_entity) {
-                piece
-            } else {
-                return;
-            };
+        let piece = if let Ok((_piece_entity, piece)) = pieces_query.get_mut(selected_piece_entity)
+        {
+            piece
+        } else {
+            return;
+        };
 
         let old_square = piece.square;
         let new_square = *square;
         let m = ChessMove::new(old_square, new_square, None);
+        let old_board = game.chess_game.current_position();
+        game.chess_game.make_move(m);
+        let new_board = game.chess_game.current_position();
 
-        if game.chess_game.current_position().legal(m) {
-            // Check if a piece of the opposite color exists in this square and despawn it
-            for (other_entity, other_piece) in pieces_entity_vec {
-                if other_piece.square == *square && other_piece.color != piece.color {
-                    // Mark the piece as taken
-                    commands.entity(other_entity).insert(Taken);
+        pieces_query.iter_mut().for_each(|(entity, mut a_piece)| {
+            // if piece is missing from new board something happened to it
+            if new_board.piece_on(a_piece.square) == None {
+                // if a new piece of the same color and type is there, the piece moved
+                let target_square = (old_board.color_combined(a_piece.color)
+                    & old_board.pieces(a_piece.piece_type)
+                    ^ new_board.color_combined(a_piece.color)
+                        & new_board.pieces(a_piece.piece_type))
+                .find(|square| new_board.piece_on(*square).is_some());
+
+                match target_square {
+                    Some(target_square) => a_piece.square = target_square,
+                    None => {
+                        // Mark the piece as taken
+                        commands.entity(entity).insert(Taken);
+                    }
                 }
             }
-
-            game.chess_game.make_move(m);
-
-            // Move piece
-            piece.square = *square;
-        }
+        });
 
         reset_selected_event.send(ResetSelectedEvent);
     }

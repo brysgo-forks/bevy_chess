@@ -51,6 +51,9 @@ fn init_next_move_text(
 
 /// Update text with the correct turn
 fn next_move_text_update(game: Res<Game>, mut query: Query<(&mut Text, &NextMoveText)>) {
+    if !game.is_changed() {
+        return;
+    }
     for (mut text, _tag) in query.iter_mut() {
         text.sections[0].value = format!(
             "Next move: {}",
