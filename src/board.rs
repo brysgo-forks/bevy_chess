@@ -218,16 +218,40 @@ fn move_piece(
     // Move the selected piece to the selected square
     let old_square = entity_pieces[piece_index].1.square;
     let new_square = *square;
-    let m = ChessMove::new(old_square, new_square, None);
-    let old_board = game.chess_game.current_position().to_owned();
     let piece_color = entity_pieces[piece_index].1.color;
     let piece_type = entity_pieces[piece_index].1.piece_type;
+    // Check if promotion
+    let promotion: Option<PieceType> = match piece_type {
+        PieceType::Pawn => match piece_color {
+            PieceColor::Black => {
+                if new_square.get_rank() == Rank::First {
+                    Some(PieceType::Queen)
+                } else {
+                    None
+                }
+            }
+            PieceColor::White => {
+                if new_square.get_rank() == Rank::Eighth {
+                    Some(PieceType::Queen)
+                } else {
+                    None
+                }
+            }
+        },
+        _ => None,
+    };
+    let m = ChessMove::new(old_square, new_square, promotion);
+    let old_board = game.chess_game.current_position().to_owned();
     if game.chess_game.make_move(m) {
         for (entity, a_piece) in entity_pieces.iter_mut() {
             {
                 // check if it is the piece we are moving
                 if a_piece.square == old_square {
                     a_piece.square = new_square;
+                    if let Some(promotion_piece) = promotion {
+                        a_piece.piece_type = promotion_piece;
+                        commands.entity(*entity).insert(Promoted);
+                    }
                 }
                 // check if piece where we moved to
                 else if a_piece.square == new_square {

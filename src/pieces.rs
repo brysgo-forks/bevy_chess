@@ -27,6 +27,39 @@ fn move_pieces(time: Res<Time>, mut query: Query<(&mut Transform, &Piece)>) {
     }
 }
 
+pub struct Promoted;
+fn promote_pieces(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    query: Query<(Entity, &Piece, &Promoted)>,
+) {
+    let queen_handle: Handle<Mesh> =
+        asset_server.load("models/chess_kit/pieces.glb#Mesh7/Primitive0");
+
+    // Add some materials
+    let white_material = materials.add(Color::rgb(1., 0.8, 0.8).into());
+    let black_material = materials.add(Color::rgb(0.3, 0.3, 0.3).into());
+
+    for (entity, piece, _taken) in query.iter() {
+        // Despawn piece and children
+        commands.entity(entity).despawn_recursive();
+        spawn_queen(
+            &mut commands,
+            match piece.color {
+                PieceColor::Black => black_material.clone(),
+                PieceColor::White => white_material.clone(),
+            },
+            piece.color,
+            queen_handle.clone(),
+            (
+                piece.square.get_rank().to_index() as u8,
+                piece.square.get_file().to_index() as u8,
+            ),
+        );
+    }
+}
+
 fn create_pieces(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -457,6 +490,7 @@ pub struct PiecesPlugin;
 impl Plugin for PiecesPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_startup_system(create_pieces.system())
-            .add_system(move_pieces.system());
+            .add_system(move_pieces.system())
+            .add_system(promote_pieces.system());
     }
 }
