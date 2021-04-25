@@ -1,3 +1,5 @@
+use std::ops::Mul;
+
 use bevy::prelude::*;
 use chess::{Color as PieceColor, File, Piece as PieceType, Rank, Square};
 
@@ -20,7 +22,7 @@ fn move_pieces(time: Res<Time>, mut query: Query<(&mut Transform, &Piece)>) {
 
         // Only move if the piece isn't already there (distance is big)
         if direction.length() > 0.1 {
-            transform.translation += direction.normalize() * time.delta_seconds();
+            transform.translation += direction.normalize().mul(5.) * time.delta_seconds();
         }
     }
 }

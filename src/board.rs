@@ -181,6 +181,24 @@ fn move_piece(
     mut pieces_query: Query<(Entity, &mut Piece)>,
     mut reset_selected_event: EventWriter<ResetSelectedEvent>,
 ) {
+    let mut piece_index_opt: Option<usize> = None;
+    let mut entity_pieces: Vec<(Entity, Mut<Piece>)> = pieces_query
+        .iter_mut()
+        .enumerate()
+        .map(|(i, (entity, a_piece))| {
+            if let Some(selected_piece_entity) = selected_piece.entity {
+                if selected_piece_entity == entity {
+                    piece_index_opt = Some(i);
+                }
+            }
+            return (entity, a_piece);
+        })
+        .collect();
+    let piece_index = if let Some(piece_index) = piece_index_opt {
+        piece_index
+    } else {
+        return;
+    };
     if !selected_square.is_changed() {
         return;
     }
@@ -197,44 +215,69 @@ fn move_piece(
         return;
     };
 
-    if let Some(selected_piece_entity) = selected_piece.entity {
-        // Move the selected piece to the selected square
-        let piece = if let Ok((_piece_entity, piece)) = pieces_query.get_mut(selected_piece_entity)
-        {
-            piece
-        } else {
-            return;
-        };
-
-        let old_square = piece.square;
-        let new_square = *square;
-        let m = ChessMove::new(old_square, new_square, None);
-        let old_board = game.chess_game.current_position();
-        game.chess_game.make_move(m);
-        let new_board = game.chess_game.current_position();
-
-        pieces_query.iter_mut().for_each(|(entity, mut a_piece)| {
-            // if piece is missing from new board something happened to it
-            if new_board.piece_on(a_piece.square) == None {
-                // if a new piece of the same color and type is there, the piece moved
-                let target_square = (old_board.color_combined(a_piece.color)
-                    & old_board.pieces(a_piece.piece_type)
-                    ^ new_board.color_combined(a_piece.color)
-                        & new_board.pieces(a_piece.piece_type))
-                .find(|square| new_board.piece_on(*square).is_some());
-
-                match target_square {
-                    Some(target_square) => a_piece.square = target_square,
-                    None => {
+    // Move the selected piece to the selected square
+    let old_square = entity_pieces[piece_index].1.square;
+    let new_square = *square;
+    let m = ChessMove::new(old_square, new_square, None);
+    let old_board = game.chess_game.current_position().to_owned();
+    let piece_color = entity_pieces[piece_index].1.color;
+    let piece_type = entity_pieces[piece_index].1.piece_type;
+    if game.chess_game.make_move(m) {
+        for (entity, a_piece) in entity_pieces.iter_mut() {
+            {
+                // check if it is the piece we are moving
+                if a_piece.square == old_square {
+                    a_piece.square = new_square;
+                }
+                // check if piece where we moved to
+                else if a_piece.square == new_square {
+                    let captured_piece = old_board.piece_on(new_square);
+                    if captured_piece.is_some() {
                         // Mark the piece as taken
-                        commands.entity(entity).insert(Taken);
+                        commands.entity(*entity).insert(Taken);
                     }
                 }
-            }
-        });
 
-        reset_selected_event.send(ResetSelectedEvent);
+                // check for castle move
+                if a_piece.piece_type == PieceType::Rook && a_piece.color == piece_color {
+                    let horizontal_movement = old_square.get_file().to_index() as i8
+                        - new_square.get_file().to_index() as i8;
+                    let castles = piece_type == PieceType::King && horizontal_movement.abs() > 1;
+
+                    if castles {
+                        if horizontal_movement > 0 {
+                            // castle to left side of board (towards A rank)
+                            if a_piece.square.get_file() == File::A {
+                                match new_square.right() {
+                                    Some(rook_square) => a_piece.square = rook_square,
+                                    None => {}
+                                }
+                            }
+                        } else {
+                            // castle to right side of board (towards H rank)
+                            if a_piece.square.get_file() == File::H {
+                                match new_square.left() {
+                                    Some(rook_square) => a_piece.square = rook_square,
+                                    None => {}
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // check for en passant
+                if piece_type == PieceType::Pawn
+                    && old_board.en_passant() == new_square.backward(piece_color)
+                    && Some(a_piece.square) == old_board.en_passant()
+                {
+                    // Mark the piece as taken
+                    commands.entity(*entity).insert(Taken);
+                }
+            }
+        }
     }
+
+    reset_selected_event.send(ResetSelectedEvent);
 }
 
 struct ResetSelectedEvent;
