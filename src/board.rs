@@ -1,17 +1,11 @@
 use crate::pieces::*;
 use bevy::{app::AppExit, prelude::*};
 use bevy_mod_picking::*;
-use chess::{Piece as PieceType, Color as PieceColor};
-
-pub struct Square {
-    pub x: u8,
-    pub y: u8,
-}
-impl Square {
-    fn is_white(&self) -> bool {
-        (self.x + self.y + 1) % 2 == 0
-    }
-}
+use chess::{
+    Board, BoardBuilder, ChessMove, Color as PieceColor, Error as ChessError, File,
+    Piece as PieceType, Rank, Square,
+};
+use std::convert::TryInto;
 
 fn create_board(
     mut commands: Commands,
@@ -37,7 +31,10 @@ fn create_board(
                     ..Default::default()
                 })
                 .insert_bundle(PickableBundle::default())
-                .insert(Square { x: i, y: j });
+                .insert(Square::make_square(
+                    Rank::from_index(i),
+                    File::from_index(j),
+                ));
         }
     }
 }
@@ -63,7 +60,7 @@ fn color_squares(
             materials.highlight_color.clone()
         } else if Some(entity) == selected_square.entity {
             materials.selected_color.clone()
-        } else if square.is_white() {
+        } else if (square.get_rank().to_index() + square.get_file().to_index() + 1) % 2 == 0 {
             materials.white_color.clone()
         } else {
             materials.black_color.clone()
@@ -169,7 +166,7 @@ fn select_piece(
     if selected_piece.entity.is_none() {
         // Select the piece in the currently selected square
         for (piece_entity, piece) in pieces_query.iter() {
-            if piece.x == square.x && piece.y == square.y && piece.color == turn.0 {
+            if piece.square == *square && piece.color == turn.0 {
                 // piece_entity is now the entity in the same square
                 selected_piece.entity = Some(piece_entity);
                 break;
@@ -204,7 +201,10 @@ fn move_piece(
     };
 
     if let Some(selected_piece_entity) = selected_piece.entity {
-        let pieces_vec = pieces_query.iter_mut().map(|(_, piece)| *piece).collect();
+        let mut board_builder = BoardBuilder::new();
+        pieces_query.iter_mut().for_each(|(_, piece)| {
+            board_builder.piece(piece.square, piece.piece_type, piece.color);
+        });
         let pieces_entity_vec = pieces_query
             .iter_mut()
             .map(|(entity, piece)| (entity, *piece))
@@ -217,25 +217,33 @@ fn move_piece(
                 return;
             };
 
-        if piece.is_move_valid((square.x, square.y), pieces_vec) {
-            // Check if a piece of the opposite color exists in this square and despawn it
-            for (other_entity, other_piece) in pieces_entity_vec {
-                if other_piece.x == square.x
-                    && other_piece.y == square.y
-                    && other_piece.color != piece.color
-                {
-                    // Mark the piece as taken
-                    commands.entity(other_entity).insert(Taken);
+        let result: Result<Board, ChessError> = board_builder.try_into();
+        match result {
+            Ok(board) => {
+                let old_square = piece.square;
+                let new_square = *square;
+                let m = ChessMove::new(old_square, new_square, None);
+
+                if board.legal(m) {
+                    // Check if a piece of the opposite color exists in this square and despawn it
+                    for (other_entity, other_piece) in pieces_entity_vec {
+                        if other_piece.square == *square && other_piece.color != piece.color {
+                            // Mark the piece as taken
+                            commands.entity(other_entity).insert(Taken);
+                        }
+                    }
+
+                    // Move piece
+                    piece.square = *square;
+
+                    // Change turn
+                    turn.change();
                 }
             }
-
-            // Move piece
-            piece.x = square.x;
-            piece.y = square.y;
-
-            // Change turn
-            turn.change();
-        }
+            Err(e) => {
+                eprintln!("Error constructing board: {}", e);
+            }
+        };
 
         reset_selected_event.send(ResetSelectedEvent);
     }

@@ -1,47 +1,22 @@
 use bevy::prelude::*;
-use chess::{Piece as PieceType, Color as PieceColor, Rank, File, Square, BoardBuilder, ChessMove, Board, Error as ChessError };
-use std::convert::TryInto;
+use chess::{Color as PieceColor, File, Piece as PieceType, Rank, Square};
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Piece {
     pub color: PieceColor,
     pub piece_type: PieceType,
     // Current position
-    pub x: u8,
-    pub y: u8,
-}
-impl Piece {
-    /// Returns the possible_positions that are available
-    pub fn is_move_valid(&self, new_position: (u8, u8), pieces: Vec<Piece>) -> bool {
-        let mut board_builder = BoardBuilder::new();
-
-        for piece in pieces {
-            board_builder.piece(Square::make_square(Rank::from_index(piece.x.into()), File::from_index(piece.y.into())), piece.piece_type, piece.color);
-        }
-
-        let result: Result<Board, ChessError> = board_builder.try_into();
-        match result {
-            Ok(board) => {
-        let old_square = Square::make_square(Rank::from_index(self.x.into()), File::from_index(self.y.into()));
-        let new_square = Square::make_square(Rank::from_index(new_position.0.into()), File::from_index(new_position.1.into()));
-        let m = ChessMove::new(old_square, new_square, None);
-
-        return board.legal(m);
-            },
-            Err(e) => {
-                eprintln!("Error constructing board: {}", e);
-                return false
-            },
-        };
-
-
-    }
+    pub square: Square,
 }
 
 fn move_pieces(time: Res<Time>, mut query: Query<(&mut Transform, &Piece)>) {
     for (mut transform, piece) in query.iter_mut() {
         // Get the direction to move in
-        let direction = Vec3::new(piece.x as f32, 0., piece.y as f32) - transform.translation;
+        let direction = Vec3::new(
+            piece.square.get_rank().to_index() as f32,
+            0.,
+            piece.square.get_file().to_index() as f32,
+        ) - transform.translation;
 
         // Only move if the piece isn't already there (distance is big)
         if direction.length() > 0.1 {
@@ -239,8 +214,10 @@ fn spawn_king(
         .insert(Piece {
             color: piece_color,
             piece_type: PieceType::King,
-            x: position.0,
-            y: position.1,
+            square: Square::make_square(
+                Rank::from_index(position.0.into()),
+                File::from_index(position.1.into()),
+            ),
         })
         // Add children to the parent
         .with_children(|parent| {
@@ -288,8 +265,10 @@ fn spawn_knight(
         .insert(Piece {
             color: piece_color,
             piece_type: PieceType::Knight,
-            x: position.0,
-            y: position.1,
+            square: Square::make_square(
+                Rank::from_index(position.0.into()),
+                File::from_index(position.1.into()),
+            ),
         })
         // Add children to the parent
         .with_children(|parent| {
@@ -336,8 +315,10 @@ fn spawn_queen(
         .insert(Piece {
             color: piece_color,
             piece_type: PieceType::Queen,
-            x: position.0,
-            y: position.1,
+            square: Square::make_square(
+                Rank::from_index(position.0.into()),
+                File::from_index(position.1.into()),
+            ),
         })
         .with_children(|parent| {
             parent.spawn_bundle(PbrBundle {
@@ -373,8 +354,10 @@ fn spawn_bishop(
         .insert(Piece {
             color: piece_color,
             piece_type: PieceType::Bishop,
-            x: position.0,
-            y: position.1,
+            square: Square::make_square(
+                Rank::from_index(position.0.into()),
+                File::from_index(position.1.into()),
+            ),
         })
         .with_children(|parent| {
             parent.spawn_bundle(PbrBundle {
@@ -410,8 +393,10 @@ fn spawn_rook(
         .insert(Piece {
             color: piece_color,
             piece_type: PieceType::Rook,
-            x: position.0,
-            y: position.1,
+            square: Square::make_square(
+                Rank::from_index(position.0.into()),
+                File::from_index(position.1.into()),
+            ),
         })
         .with_children(|parent| {
             parent.spawn_bundle(PbrBundle {
@@ -447,8 +432,10 @@ fn spawn_pawn(
         .insert(Piece {
             color: piece_color,
             piece_type: PieceType::Pawn,
-            x: position.0,
-            y: position.1,
+            square: Square::make_square(
+                Rank::from_index(position.0.into()),
+                File::from_index(position.1.into()),
+            ),
         })
         .with_children(|parent| {
             parent.spawn_bundle(PbrBundle {
