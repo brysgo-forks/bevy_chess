@@ -1,3 +1,7 @@
+# FORK information
+
+This is just a toy for me to play with and learn bevy and rust.
+
 # Chess in Bevy
 
 This is an implementation of the classic Chess game in the [Bevy](https://github.com/bevyengine/bevy) game engine, using the [bevy_mod_picking](https://github.com/aevyrie/bevy_mod_picking/) plugin.
