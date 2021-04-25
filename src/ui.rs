@@ -50,14 +50,11 @@ fn init_next_move_text(
 }
 
 /// Update text with the correct turn
-fn next_move_text_update(turn: Res<PlayerTurn>, mut query: Query<(&mut Text, &NextMoveText)>) {
-    if !turn.is_changed() {
-        return;
-    }
+fn next_move_text_update(game: Res<Game>, mut query: Query<(&mut Text, &NextMoveText)>) {
     for (mut text, _tag) in query.iter_mut() {
         text.sections[0].value = format!(
             "Next move: {}",
-            match turn.0 {
+            match game.chess_game.current_position().side_to_move() {
                 PieceColor::White => "White",
                 PieceColor::Black => "Black",
             }

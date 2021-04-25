@@ -2,10 +2,19 @@ use crate::pieces::*;
 use bevy::{app::AppExit, prelude::*};
 use bevy_mod_picking::*;
 use chess::{
-    Board, BoardBuilder, ChessMove, Color as PieceColor, Error as ChessError, File,
-    Piece as PieceType, Rank, Square,
+    ChessMove, Color as PieceColor, File, Game as ChessGame, Piece as PieceType, Rank, Square,
 };
-use std::convert::TryInto;
+
+pub struct Game {
+    pub chess_game: ChessGame,
+}
+impl Default for Game {
+    fn default() -> Self {
+        Game {
+            chess_game: ChessGame::new(),
+        }
+    }
+}
 
 fn create_board(
     mut commands: Commands,
@@ -98,20 +107,6 @@ struct SelectedSquare {
 struct SelectedPiece {
     entity: Option<Entity>,
 }
-pub struct PlayerTurn(pub PieceColor);
-impl Default for PlayerTurn {
-    fn default() -> Self {
-        Self(PieceColor::White)
-    }
-}
-impl PlayerTurn {
-    fn change(&mut self) {
-        self.0 = match self.0 {
-            PieceColor::White => PieceColor::Black,
-            PieceColor::Black => PieceColor::White,
-        }
-    }
-}
 
 fn select_square(
     mouse_button_inputs: Res<Input<MouseButton>>,
@@ -143,7 +138,7 @@ fn select_square(
 fn select_piece(
     selected_square: Res<SelectedSquare>,
     mut selected_piece: ResMut<SelectedPiece>,
-    turn: Res<PlayerTurn>,
+    game: Res<Game>,
     squares_query: Query<&Square>,
     pieces_query: Query<(Entity, &Piece)>,
 ) {
@@ -166,7 +161,9 @@ fn select_piece(
     if selected_piece.entity.is_none() {
         // Select the piece in the currently selected square
         for (piece_entity, piece) in pieces_query.iter() {
-            if piece.square == *square && piece.color == turn.0 {
+            if piece.square == *square
+                && piece.color == game.chess_game.current_position().side_to_move()
+            {
                 // piece_entity is now the entity in the same square
                 selected_piece.entity = Some(piece_entity);
                 break;
@@ -179,7 +176,7 @@ fn move_piece(
     mut commands: Commands,
     selected_square: Res<SelectedSquare>,
     selected_piece: Res<SelectedPiece>,
-    mut turn: ResMut<PlayerTurn>,
+    mut game: ResMut<Game>,
     squares_query: Query<&Square>,
     mut pieces_query: Query<(Entity, &mut Piece)>,
     mut reset_selected_event: EventWriter<ResetSelectedEvent>,
@@ -201,10 +198,6 @@ fn move_piece(
     };
 
     if let Some(selected_piece_entity) = selected_piece.entity {
-        let mut board_builder = BoardBuilder::new();
-        pieces_query.iter_mut().for_each(|(_, piece)| {
-            board_builder.piece(piece.square, piece.piece_type, piece.color);
-        });
         let pieces_entity_vec = pieces_query
             .iter_mut()
             .map(|(entity, piece)| (entity, *piece))
@@ -217,33 +210,24 @@ fn move_piece(
                 return;
             };
 
-        let result: Result<Board, ChessError> = board_builder.try_into();
-        match result {
-            Ok(board) => {
-                let old_square = piece.square;
-                let new_square = *square;
-                let m = ChessMove::new(old_square, new_square, None);
+        let old_square = piece.square;
+        let new_square = *square;
+        let m = ChessMove::new(old_square, new_square, None);
 
-                if board.legal(m) {
-                    // Check if a piece of the opposite color exists in this square and despawn it
-                    for (other_entity, other_piece) in pieces_entity_vec {
-                        if other_piece.square == *square && other_piece.color != piece.color {
-                            // Mark the piece as taken
-                            commands.entity(other_entity).insert(Taken);
-                        }
-                    }
-
-                    // Move piece
-                    piece.square = *square;
-
-                    // Change turn
-                    turn.change();
+        if game.chess_game.current_position().legal(m) {
+            // Check if a piece of the opposite color exists in this square and despawn it
+            for (other_entity, other_piece) in pieces_entity_vec {
+                if other_piece.square == *square && other_piece.color != piece.color {
+                    // Mark the piece as taken
+                    commands.entity(other_entity).insert(Taken);
                 }
             }
-            Err(e) => {
-                eprintln!("Error constructing board: {}", e);
-            }
-        };
+
+            game.chess_game.make_move(m);
+
+            // Move piece
+            piece.square = *square;
+        }
 
         reset_selected_event.send(ResetSelectedEvent);
     }
@@ -292,7 +276,7 @@ impl Plugin for BoardPlugin {
         app.init_resource::<SelectedSquare>()
             .init_resource::<SelectedPiece>()
             .init_resource::<SquareMaterials>()
-            .init_resource::<PlayerTurn>()
+            .init_resource::<Game>()
             .add_event::<ResetSelectedEvent>()
             .add_startup_system(create_board.system())
             .add_system(color_squares.system())
