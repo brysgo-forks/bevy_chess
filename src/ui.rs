@@ -1,5 +1,6 @@
-use crate::{board::*, pieces::*};
+use crate::{board::*};
 use bevy::prelude::*;
+use chess::{Color as PieceColor};
 
 // Component to mark the Text entity
 struct NextMoveText;

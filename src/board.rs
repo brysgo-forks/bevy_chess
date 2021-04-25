@@ -1,6 +1,7 @@
 use crate::pieces::*;
 use bevy::{app::AppExit, prelude::*};
 use bevy_mod_picking::*;
+use chess::{Piece as PieceType, Color as PieceColor};
 
 pub struct Square {
     pub x: u8,

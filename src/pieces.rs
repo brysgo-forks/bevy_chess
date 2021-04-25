@@ -1,20 +1,6 @@
 use bevy::prelude::*;
-
-#[derive(Clone, Copy, PartialEq)]
-pub enum PieceColor {
-    White,
-    Black,
-}
-
-#[derive(Clone, Copy, PartialEq)]
-pub enum PieceType {
-    King,
-    Queen,
-    Bishop,
-    Knight,
-    Rook,
-    Pawn,
-}
+use chess::{Piece as PieceType, Color as PieceColor, Rank, File, Square, BoardBuilder, ChessMove, Board, Error as ChessError };
+use std::convert::TryInto;
 
 #[derive(Clone, Copy)]
 pub struct Piece {
@@ -27,170 +13,29 @@ pub struct Piece {
 impl Piece {
     /// Returns the possible_positions that are available
     pub fn is_move_valid(&self, new_position: (u8, u8), pieces: Vec<Piece>) -> bool {
-        // If there's a piece of the same color in the same square, it can't move
-        if color_of_square(new_position, &pieces) == Some(self.color) {
-            return false;
-        }
+        let mut board_builder = BoardBuilder::new();
 
-        match self.piece_type {
-            PieceType::King => {
-                // Horizontal
-                ((self.x as i8 - new_position.0 as i8).abs() == 1
-                    && (self.y == new_position.1))
-                // Vertical
-                || ((self.y as i8 - new_position.1 as i8).abs() == 1
-                    && (self.x == new_position.0))
-                // Diagonal
-                || ((self.x as i8 - new_position.0 as i8).abs() == 1
-                    && (self.y as i8 - new_position.1 as i8).abs() == 1)
-            }
-            PieceType::Queen => {
-                is_path_empty((self.x, self.y), new_position, &pieces)
-                    && ((self.x as i8 - new_position.0 as i8).abs()
-                        == (self.y as i8 - new_position.1 as i8).abs()
-                        || ((self.x == new_position.0 && self.y != new_position.1)
-                            || (self.y == new_position.1 && self.x != new_position.0)))
-            }
-            PieceType::Bishop => {
-                is_path_empty((self.x, self.y), new_position, &pieces)
-                    && (self.x as i8 - new_position.0 as i8).abs()
-                        == (self.y as i8 - new_position.1 as i8).abs()
-            }
-            PieceType::Knight => {
-                ((self.x as i8 - new_position.0 as i8).abs() == 2
-                    && (self.y as i8 - new_position.1 as i8).abs() == 1)
-                    || ((self.x as i8 - new_position.0 as i8).abs() == 1
-                        && (self.y as i8 - new_position.1 as i8).abs() == 2)
-            }
-            PieceType::Rook => {
-                is_path_empty((self.x, self.y), new_position, &pieces)
-                    && ((self.x == new_position.0 && self.y != new_position.1)
-                        || (self.y == new_position.1 && self.x != new_position.0))
-            }
-            PieceType::Pawn => {
-                if self.color == PieceColor::White {
-                    // Normal move
-                    if new_position.0 as i8 - self.x as i8 == 1 && (self.y == new_position.1) {
-                        if color_of_square(new_position, &pieces).is_none() {
-                            return true;
-                        }
-                    }
-
-                    // Move 2 squares
-                    if self.x == 1
-                        && new_position.0 as i8 - self.x as i8 == 2
-                        && (self.y == new_position.1)
-                        && is_path_empty((self.x, self.y), new_position, &pieces)
-                    {
-                        if color_of_square(new_position, &pieces).is_none() {
-                            return true;
-                        }
-                    }
-
-                    // Take piece
-                    if new_position.0 as i8 - self.x as i8 == 1
-                        && (self.y as i8 - new_position.1 as i8).abs() == 1
-                    {
-                        if color_of_square(new_position, &pieces) == Some(PieceColor::Black) {
-                            return true;
-                        }
-                    }
-                } else {
-                    // Normal move
-                    if new_position.0 as i8 - self.x as i8 == -1 && (self.y == new_position.1) {
-                        if color_of_square(new_position, &pieces).is_none() {
-                            return true;
-                        }
-                    }
-
-                    // Move 2 squares
-                    if self.x == 6
-                        && new_position.0 as i8 - self.x as i8 == -2
-                        && (self.y == new_position.1)
-                        && is_path_empty((self.x, self.y), new_position, &pieces)
-                    {
-                        if color_of_square(new_position, &pieces).is_none() {
-                            return true;
-                        }
-                    }
-
-                    // Take piece
-                    if new_position.0 as i8 - self.x as i8 == -1
-                        && (self.y as i8 - new_position.1 as i8).abs() == 1
-                    {
-                        if color_of_square(new_position, &pieces) == Some(PieceColor::White) {
-                            return true;
-                        }
-                    }
-                }
-
-                false
-            }
-        }
-    }
-}
-
-fn is_path_empty(begin: (u8, u8), end: (u8, u8), pieces: &Vec<Piece>) -> bool {
-    // Same column
-    if begin.0 == end.0 {
         for piece in pieces {
-            if piece.x == begin.0
-                && ((piece.y > begin.1 && piece.y < end.1)
-                    || (piece.y > end.1 && piece.y < begin.1))
-            {
-                return false;
-            }
+            board_builder.piece(Square::make_square(Rank::from_index(piece.x.into()), File::from_index(piece.y.into())), piece.piece_type, piece.color);
         }
-    }
-    // Same row
-    if begin.1 == end.1 {
-        for piece in pieces {
-            if piece.y == begin.1
-                && ((piece.x > begin.0 && piece.x < end.0)
-                    || (piece.x > end.0 && piece.x < begin.0))
-            {
-                return false;
-            }
-        }
-    }
 
-    // Diagonals
-    let x_diff = (begin.0 as i8 - end.0 as i8).abs();
-    let y_diff = (begin.1 as i8 - end.1 as i8).abs();
-    if x_diff == y_diff {
-        for i in 1..x_diff {
-            let pos = if begin.0 < end.0 && begin.1 < end.1 {
-                // left bottom - right top
-                (begin.0 + i as u8, begin.1 + i as u8)
-            } else if begin.0 < end.0 && begin.1 > end.1 {
-                // left top - right bottom
-                (begin.0 + i as u8, begin.1 - i as u8)
-            } else if begin.0 > end.0 && begin.1 < end.1 {
-                // right bottom - left top
-                (begin.0 - i as u8, begin.1 + i as u8)
-            } else {
-                // begin.0 > end.0 && begin.1 > end.1
-                // right top - left bottom
-                (begin.0 - i as u8, begin.1 - i as u8)
-            };
+        let result: Result<Board, ChessError> = board_builder.try_into();
+        match result {
+            Ok(board) => {
+        let old_square = Square::make_square(Rank::from_index(self.x.into()), File::from_index(self.y.into()));
+        let new_square = Square::make_square(Rank::from_index(new_position.0.into()), File::from_index(new_position.1.into()));
+        let m = ChessMove::new(old_square, new_square, None);
 
-            if color_of_square(pos, pieces).is_some() {
-                return false;
-            }
-        }
+        return board.legal(m);
+            },
+            Err(e) => {
+                eprintln!("Error constructing board: {}", e);
+                return false
+            },
+        };
+
+
     }
-
-    true
-}
-
-/// Returns None if square is empty, returns a Some with the color if not
-fn color_of_square(pos: (u8, u8), pieces: &Vec<Piece>) -> Option<PieceColor> {
-    for piece in pieces {
-        if piece.x == pos.0 && piece.y == pos.1 {
-            return Some(piece.color);
-        }
-    }
-    None
 }
 
 fn move_pieces(time: Res<Time>, mut query: Query<(&mut Transform, &Piece)>) {
