@@ -20,7 +20,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 
 # [Optional] Uncomment this section to install additional OS packages.
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
-    && apt-get -y install --no-install-recommends lld libasound2-dev libasound2 libudev-dev udev libpulse0 mesa-utils libvulkan-dev
+    && apt-get -y install --no-install-recommends lld libasound2-dev libasound2 libudev-dev udev libpulse0 mesa-utils libvulkan-dev vlc pulseaudio g++ pkg-config libx11-dev mesa-vulkan-drivers clang
 
 RUN echo "cargo install cargo-watch" | su vscode
  
