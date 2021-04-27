@@ -3,7 +3,7 @@
   "tasks": [
     {
       "type": "cargo",
-      "command": "watch --features bevy/dynamic -x run",
+      "command": "watch -x run",
       "problemMatcher": ["$rustc"],
       "label": "rust: cargo watch"
     }
