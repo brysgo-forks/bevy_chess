@@ -10,3 +10,6 @@ edition = "2018"
 bevy = { version = "0.5" }
 bevy_mod_picking = "0.4"
 chess = "3.2.0"
+bevy_rapier3d = { version = "0.9", features = [ "parallel", "simd-stable" ] }
+bevy_prototype_character_controller = { git = "https://github.com/superdump/bevy_prototype_character_controller", features = ["use_rapier"] }
+rand = "0.8"

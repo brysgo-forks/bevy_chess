@@ -1,6 +1,7 @@
 use crate::pieces::*;
 use bevy::{app::AppExit, prelude::*};
 use bevy_mod_picking::*;
+use bevy_rapier3d::rapier::{dynamics::RigidBodyBuilder, geometry::ColliderBuilder};
 use chess::{
     ChessMove, Color as PieceColor, File, Game as ChessGame, Piece as PieceType, Rank, Square,
 };
@@ -24,6 +25,25 @@ fn create_board(
     // Add meshes
     let mesh = meshes.add(Mesh::from(shape::Plane { size: 1. }));
 
+    // Ground cuboid
+    let box_xz = 200.0;
+    let box_y = 0.;
+    commands
+        .spawn_bundle(PbrBundle {
+            material: materials.white_color.clone(),
+            mesh: mesh.clone(),
+            transform: Transform::from_matrix(Mat4::from_scale_rotation_translation(
+                Vec3::new(box_xz, box_y, box_xz),
+                Quat::IDENTITY,
+                Vec3::ZERO,
+            )),
+            ..Default::default()
+        })
+        .insert_bundle((
+            RigidBodyBuilder::new_static(),
+            ColliderBuilder::cuboid(0.5 * box_xz, 0.5 * box_y, 0.5 * box_xz),
+        ));
+
     // Spawn 64 squares
     for i in 0..8 {
         for j in 0..8 {
@@ -36,7 +56,7 @@ fn create_board(
                     } else {
                         materials.black_color.clone()
                     },
-                    transform: Transform::from_translation(Vec3::new(i as f32, 0., j as f32)),
+                    transform: Transform::from_translation(Vec3::new(i as f32, 0.1, j as f32)),
                     ..Default::default()
                 })
                 .insert_bundle(PickableBundle::default())

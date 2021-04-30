@@ -1,6 +1,7 @@
 use std::ops::Mul;
 
 use bevy::prelude::*;
+use bevy_rapier3d::rapier::{dynamics::RigidBodyBuilder, geometry::ColliderBuilder};
 use chess::{Color as PieceColor, File, Piece as PieceType, Rank, Square};
 
 #[derive(Debug, Clone, Copy)]
@@ -236,14 +237,11 @@ fn spawn_king(
     mesh_cross: Handle<Mesh>,
     position: (u8, u8),
 ) {
+    let translation = Vec3::new(position.0 as f32, 0.1, position.1 as f32);
     commands
         // Spawn parent entity
         .spawn_bundle(PbrBundle {
-            transform: Transform::from_translation(Vec3::new(
-                position.0 as f32,
-                0.,
-                position.1 as f32,
-            )),
+            transform: Transform::from_translation(translation),
             ..Default::default()
         })
         .insert(Piece {
@@ -254,6 +252,10 @@ fn spawn_king(
                 File::from_index(position.1.into()),
             ),
         })
+        .insert_bundle((
+            RigidBodyBuilder::new_dynamic().translation(position.0 as f32, 0.1, position.1 as f32),
+            ColliderBuilder::cuboid(0.5, 0.1, 0.5),
+        ))
         // Add children to the parent
         .with_children(|parent| {
             parent.spawn_bundle(PbrBundle {

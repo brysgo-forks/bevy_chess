@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 use bevy_mod_picking::*;
 
+mod player;
+use player::*;
 mod pieces;
 use pieces::*;
 mod board;
@@ -8,6 +10,7 @@ use board::*;
 mod ui;
 use ui::*;
 
+#[bevy_main]
 fn main() {
     App::build()
         // Set antialiasing to use 4 samples
@@ -24,6 +27,7 @@ fn main() {
         .add_plugin(PickingPlugin)
         .add_plugin(BoardPlugin)
         .add_plugin(PiecesPlugin)
+        .add_plugin(PlayerPlugin)
         .add_plugin(UIPlugin)
         .add_startup_system(setup.system())
         .run();
@@ -45,5 +49,7 @@ fn setup(mut commands: Commands) {
         .spawn_bundle(LightBundle {
             transform: Transform::from_translation(Vec3::new(4.0, 8.0, 4.0)),
             ..Default::default()
-        });
+        })
+        .commands();
+    // Ensure we can see things
 }
